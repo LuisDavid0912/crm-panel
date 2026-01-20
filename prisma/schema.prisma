@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id         BigInt   @id @default(autoincrement())
+  slug       String   @unique
+  name       String
+  brandVoice String?  @map("brand_voice")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  leads      Lead[]
+
+  @@map("tenants")
+}
+
+model Lead {
+  id          BigInt   @id @default(autoincrement())
+  tenantId    BigInt   @map("tenant_id")
+  email       String
+  fullName    String?  @map("full_name")
+  source      String?
+  status      String   @default("NEW")
+  utmSource   String?  @map("utm_source")
+  utmCampaign String?  @map("utm_campaign")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @map("updated_at")
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, email])
+  @@map("leads")
+}
