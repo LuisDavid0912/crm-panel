@@ -1,30 +1,30 @@
 import { notFound } from "next/navigation";
 import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
+declare global {
+  // eslint-disable-next-line no-var
+  var prisma: PrismaClient | undefined;
+}
 
-// Recomendado mientras estás iterando en prod (evita caching raro)
-export const dynamic = "force-dynamic";
+// Evita crear muchos PrismaClient en dev/hot-reload
+const prisma = global.prisma ?? new PrismaClient();
+if (process.env.NODE_ENV !== "production") global.prisma = prisma;
 
 export default async function PublicFormPage({
   params,
 }: {
-  params: { slug?: string };
+  params: { slug: string } | Promise<{ slug: string }>;
 }) {
-  const slug = (params?.slug ?? "").trim();
+  const { slug } = await params; // <- CLAVE: evita slug undefined
 
-  if (!slug) {
-    return notFound();
-  }
+  if (!slug) return notFound();
 
   const tenant = await prisma.tenant.findUnique({
     where: { slug },
     select: { name: true },
   });
 
-  if (!tenant) {
-    return notFound();
-  }
+  if (!tenant) return notFound();
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
@@ -34,6 +34,7 @@ export default async function PublicFormPage({
           Déjame tu nombre y correo para enviarte el recurso.
         </p>
 
+        {/* Esto manda application/x-www-form-urlencoded por defecto */}
         <form action="/api/leads" method="POST" className="mt-6 space-y-4">
           <input type="hidden" name="tenant_slug" value={slug} />
 
@@ -58,17 +59,11 @@ export default async function PublicFormPage({
             />
           </div>
 
-          <button
-            type="submit"
-            className="w-full rounded-xl bg-white text-black py-3 font-medium"
-          >
+          <button className="w-full rounded-xl bg-white text-black py-3 font-medium">
             Enviar
           </button>
         </form>
       </div>
     </div>
-  );
-}
-
   );
 }
