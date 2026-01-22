@@ -13,7 +13,7 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-// Convierte BigInt -> string para que JSON no explote
+// ✅ Convierte BigInt -> string para que JSON no explote
 function jsonSafe<T>(data: T): T {
   return JSON.parse(
     JSON.stringify(data, (_k, v) => (typeof v === "bigint" ? v.toString() : v))
@@ -72,20 +72,24 @@ export async function POST(req: Request) {
   });
 
   // lead_events: (lead_id, type, payload)
-  await prisma.$executeRawUnsafe(
-    `insert into lead_events (lead_id, type, payload)
-     values ($1, 'lead_created', $2::jsonb)`,
-    lead.id,
-    JSON.stringify({ source })
-  );
+  await prisma.$executeRaw`
+    insert into lead_events (lead_id, type, payload)
+    values (${lead.id}, 'lead_created', ${JSON.stringify({ source })}::jsonb)
+  `;
 
-  // Si NO es JSON, asumimos navegador/form y redirigimos
+  // ✅ Si NO es JSON, asumimos navegador/form y redirigimos al dominio real (no localhost)
   if (!ct.includes("application/json")) {
-    return NextResponse.redirect(new URL(`/c/${tenantSlug}/gracias`, req.url), {
-      status: 302,
-    });
+    const proto = req.headers.get("x-forwarded-proto") ?? "https";
+    const host =
+      req.headers.get("x-forwarded-host") ??
+      req.headers.get("x-forwarded-server") ??
+      req.headers.get("host") ??
+      "crm.jucemaga.com";
+
+    return NextResponse.redirect(`${proto}://${host}/c/${tenantSlug}/gracias`, 302);
   }
 
   // JSON response (API)
   return NextResponse.json(jsonSafe({ ok: true, lead }));
 }
+
