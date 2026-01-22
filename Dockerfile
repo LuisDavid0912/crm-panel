@@ -1,35 +1,38 @@
-# ---- deps ----
-FROM node:20-alpine AS deps
+# syntax=docker/dockerfile:1
+
+FROM node:20-bookworm-slim AS deps
 WORKDIR /app
-
-# Necesario para Prisma en alpine
-RUN apk add --no-cache libc6-compat openssl
-
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  ca-certificates openssl \
+  && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# ---- build ----
-FROM node:20-alpine AS builder
+FROM node:20-bookworm-slim AS builder
 WORKDIR /app
-RUN apk add --no-cache libc6-compat openssl
-
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  ca-certificates openssl \
+  && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Prisma client (no necesita DB)
+# Más estable en Docker
+ENV NEXT_DISABLE_TURBOPACK=1
+ENV NEXT_TELEMETRY_DISABLED=1
+
 RUN npx prisma generate
 RUN npm run build
 
-# ---- runner ----
-FROM node:20-alpine AS runner
+FROM node:20-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN apk add --no-cache libc6-compat openssl
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  ca-certificates openssl \
+  && rm -rf /var/lib/apt/lists/*
 
-# Next standalone output (requiere que en next.config.* esté output:'standalone')
-# Pero como create-next-app no lo trae siempre, vamos por la ruta simple:
 COPY --from=builder /app ./
-
 EXPOSE 3000
 CMD ["npm","run","start"]
+
