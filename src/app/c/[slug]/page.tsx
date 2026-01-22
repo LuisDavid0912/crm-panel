@@ -3,13 +3,28 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-export default async function PublicFormPage({ params }: { params: { slug: string } }) {
+// Recomendado mientras estás iterando en prod (evita caching raro)
+export const dynamic = "force-dynamic";
+
+export default async function PublicFormPage({
+  params,
+}: {
+  params: { slug?: string };
+}) {
+  const slug = (params?.slug ?? "").trim();
+
+  if (!slug) {
+    return notFound();
+  }
+
   const tenant = await prisma.tenant.findUnique({
-    where: { slug: params.slug },
+    where: { slug },
     select: { name: true },
   });
 
-  if (!tenant) return notFound();
+  if (!tenant) {
+    return notFound();
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
@@ -20,7 +35,7 @@ export default async function PublicFormPage({ params }: { params: { slug: strin
         </p>
 
         <form action="/api/leads" method="POST" className="mt-6 space-y-4">
-          <input type="hidden" name="tenant_slug" value={params.slug} />
+          <input type="hidden" name="tenant_slug" value={slug} />
 
           <div>
             <label className="text-sm text-zinc-300">Nombre</label>
@@ -43,11 +58,17 @@ export default async function PublicFormPage({ params }: { params: { slug: strin
             />
           </div>
 
-          <button className="w-full rounded-xl bg-white text-black py-3 font-medium">
+          <button
+            type="submit"
+            className="w-full rounded-xl bg-white text-black py-3 font-medium"
+          >
             Enviar
           </button>
         </form>
       </div>
     </div>
+  );
+}
+
   );
 }
